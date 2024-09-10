@@ -1,0 +1,4 @@
+Scrapy==2.11.2
+pyppeteer==1.0.2
+beautifulsoup4==4.12.2
+Twisted==22.10.0
