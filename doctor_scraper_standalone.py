@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 
 class DoctorScraper:
     def __init__(self):
-        self.max_doctors = 5
+        self.max_doctors = 1
         self.browser = None
 
     async def init_browser(self):
@@ -18,8 +18,7 @@ class DoctorScraper:
             args=['--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport=None,
             autoClose=False,
-            executablePath='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-            userDataDir='./user_data'
+            executablePath='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
         )
         logging.info("Browser initialized successfully")
 
@@ -63,10 +62,7 @@ class DoctorScraper:
             logging.error(f"Error fetching page: {e}", exc_info=True)
             content = await page.content()  # Get content even if there's an error
             status = 500
-        finally:
-            await page.screenshot({'path': 'debug_screenshot.png', 'fullPage': True})
-            logging.info("Saved debug screenshot to debug_screenshot.png")
-        
+            
         return page, content, status
 
     async def scrape_profile(self, page, profile_url):
@@ -74,19 +70,13 @@ class DoctorScraper:
             await page.goto(profile_url, {'waitUntil': 'networkidle0', 'timeout': 60000})
             logging.info(f"Navigated to profile: {profile_url}")
             
-            # Wait for the profile content to load
             try:
                 await page.waitForSelector('.provider-info', {'visible': True, 'timeout': 30000})
             except Exception as e:
                 logging.warning(f"Timeout waiting for .provider-info: {e}")
-                # Continue with the scraping even if this selector is not found
             
             profile_content = await page.content()
             profile_soup = BeautifulSoup(profile_content, 'html.parser')
-            
-            # Extract phone number
-            phone_number = profile_soup.select_one('.phone a')
-            phone_number = phone_number.text.strip() if phone_number else ''
             
             # Extract insurance plans
             insurance_plans = []
@@ -106,10 +96,75 @@ class DoctorScraper:
                         'year': year.text.strip()
                     })
             
+            # Extract Quick Facts information
+            quick_facts = profile_soup.select_one('.quickfacts-card')
+            years_experience = ''
+            languages = []
+            if quick_facts:
+                # Extract years of experience
+                experience_item = quick_facts.select_one('li:contains("years of experience")')
+                if experience_item:
+                    years_experience = experience_item.text.split()[0]
+                
+                # Extract languages
+                language_item = quick_facts.select_one('li:contains("speaks")')
+                if language_item:
+                    languages = language_item.text.replace('speaks', '').strip().split(', ')
+            
+            # Extract state from breadcrumb
+            breadcrumb = profile_soup.select_one('.webmd-breadcrumb')
+            state = ''
+            if breadcrumb:
+                state_item = breadcrumb.select_one('.breadcrumb-state')
+                if state_item:
+                    state_link = state_item.select_one('a')
+                    if state_link:
+                        state = state_link.text.strip()
+
+            # Extract locations
+            locations = []
+            location_sections = profile_soup.select('.location-map.show-less.limited-locations')
+            for section in location_sections:
+                location_lines = section.select('.location-line')
+                for line in location_lines:
+                    location_name = line.select_one('.title.loc-vl-locna h3')
+                    address = line.select_one('.address-first-line.top-spacing.grey-darken-text.loc-vl-locad')
+                    loc_city = line.select_one('.loc-vl-loccty')
+                    loc_state = line.select_one('.loc-vl-locsta')
+                    phone = line.select_one('.phone.top-more-spacing a')
+                    
+                    if location_name and address and loc_city and loc_state:
+                        locations.append({
+                            'name': location_name.text.strip(),
+                            'address': address.text.strip(),
+                            'city': loc_city.text.strip().rstrip(','),
+                            'state': loc_state.text.strip(),
+                            'phone': phone.text.strip() if phone else ''
+                        })
+            
+            # If no locations were found, try to extract from the main profile
+            if not locations:
+                location_info = profile_soup.select_one('.location')
+                if location_info:
+                    location_text = location_info.text.strip()
+                    location_parts = location_text.split(',')
+                    if len(location_parts) >= 2:
+                        city = location_parts[0].strip()
+                        state = location_parts[1].strip().split()[0] if len(location_parts[1].strip().split()) > 0 else ''
+                        locations.append({
+                            'name': 'Main Office',
+                            'address': '',
+                            'city': city,
+                            'state': state,
+                            'phone': ''
+                        })
+
             return {
-                'phone_number': phone_number,
                 'insurance_plans': insurance_plans,
-                'education': education
+                'education': education,
+                'years_experience': years_experience,
+                'languages': languages,
+                'locations': locations
             }
         except Exception as e:
             logging.error(f"Error scraping profile: {e}", exc_info=True)
@@ -134,23 +189,14 @@ class DoctorScraper:
                 doctor_item['full_name'] = full_name.replace("Dr. ", "").replace("DACM, L.Ac.", "").strip()
                 doctor_item['title'] = "Dr."
                 doctor_item['specialty'] = doctor.select_one("div.specialty").text.strip()
-                doctor_item['location'] = doctor.select_one("address.card-address span.citystate").text.strip()
                 doctor_item['country'] = 'USA'
                 doctor_item['company'] = ''
-                phone_button = doctor.select_one("a.cta-phone-button")
-                doctor_item['phone_number'] = phone_button.text.strip() if phone_button else ''
                 doctor_item['email'] = ''
-                doctor_item['company_domain'] = 'vitals.com'
 
                 name_parts = doctor_item['full_name'].split()
                 if len(name_parts) > 1:
                     doctor_item['first_name'] = name_parts[0]
                     doctor_item['last_name'] = ' '.join(name_parts[1:])
-
-                # Extract years of experience
-                experience = doctor.select_one("li:contains('years of experience')")
-                if experience:
-                    doctor_item['years_of_experience'] = experience.text.split()[0]
 
                 # Check if "View Profile" button exists
                 profile_link = doctor.select_one("a.readmore")
@@ -161,13 +207,18 @@ class DoctorScraper:
                         doctor_item.update(profile_data)
                     except Exception as e:
                         logging.error(f"Error scraping profile: {e}", exc_info=True)
-                        # Continue with the data we have even if profile scraping fails
 
                 logging.info(f"Scraped doctor: {doctor_item}")
                 scraped_doctors.append(doctor_item)
             except Exception as e:
                 logging.error(f"Error parsing doctor card: {e}", exc_info=True)
         
+        # At the end of parse_content method
+        for doctor in scraped_doctors:
+            for key, value in doctor.items():
+                if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                    doctor[key] = str(value)
+
         return scraped_doctors
 
     async def scrape(self):
@@ -179,9 +230,9 @@ class DoctorScraper:
             logging.info(f"Scraped {len(doctors)} doctors")
             
             # Save to file
-            with open('scraped_doctors.json', 'w') as f:
+            with open('scraped_doctors_test.json', 'w') as f:
                 json.dump(doctors, f, indent=2)
-            logging.info("Saved scraped data to scraped_doctors.json")
+            logging.info("Saved scraped data to scraped_doctors_test.json")
         else:
             logging.error(f"Failed to fetch page: status {status}")
 
