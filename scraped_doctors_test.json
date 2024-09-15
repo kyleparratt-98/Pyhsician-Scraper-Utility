@@ -2,10 +2,13 @@
   {
     "full_name": "Dr. Paul F. Ryan DACM, L.Ac.",
     "title": "Dr.",
-    "specialty": "Acupuncture, Integrative Medicine",
+    "specialties": [
+      "Acupuncture",
+      "Integrative Medicine"
+    ],
     "country": "USA",
     "company": "Private",
-    "email": "",
+    "email": "N/A",
     "first_name": "Paul F",
     "last_name": "Ryan",
     "insurance_plans": [
@@ -38,16 +41,20 @@
         "phone": "917-979-3949"
       }
     ],
-    "company_website": "",
+    "company_website": "N/A",
     "phone": "917-979-3949"
   },
   {
     "full_name": "Dr. Julia Walls",
     "title": "Dr.",
-    "specialty": "Acupuncture, Chinese Medicine, Holistic Wellness",
+    "specialties": [
+      "Acupuncture",
+      "Holistic Wellness",
+      "Chinese Medicine"
+    ],
     "country": "USA",
     "company": "Tualatin Acupuncture",
-    "email": "",
+    "email": "info@tualatin-acupuncture.com",
     "first_name": "Julia",
     "last_name": "Walls",
     "insurance_plans": [
@@ -69,7 +76,7 @@
       "Workmans Comp"
     ],
     "education": [],
-    "years_experience": "",
+    "years_experience": "N/A",
     "languages": [
       "English"
     ],

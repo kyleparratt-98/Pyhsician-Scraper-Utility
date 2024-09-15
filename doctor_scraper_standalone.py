@@ -112,18 +112,18 @@ class DoctorScraper:
             doctor_item = {
                 'full_name': '',
                 'title': '',
-                'specialty': '',
+                'specialties': [],
                 'country': 'USA',
                 'company': '',
-                'email': '',
+                'email': 'N/A',  # Initialize with 'N/A'
                 'first_name': '',
                 'last_name': '',
                 'insurance_plans': [],
                 'education': [],
-                'years_experience': '',
+                'years_experience': 'N/A',  # Initialize with 'N/A'
                 'languages': [],
                 'locations': [],
-                'company_website': '',
+                'company_website': 'N/A',  # Initialize with 'N/A'
                 'phone': '' 
             }
 
@@ -144,9 +144,17 @@ class DoctorScraper:
                 doctor_item['first_name'] = first_name
                 doctor_item['last_name'] = last_name
 
-            specialty_element = profile_soup.select_one("div.specialty.loc-vs-dspsplty")
-            if specialty_element:
-                doctor_item['specialty'] = specialty_element.text.strip()
+            specialty_elements = profile_soup.select("div.specialty.loc-vs-dspsplty")
+            individual_specialty_elements = profile_soup.select("div.loc-vs-dspsplty")
+            
+            specialties = []
+            for specialty in specialty_elements + individual_specialty_elements:
+                # Split the specialties if they're comma-separated
+                split_specialties = [s.strip() for s in specialty.text.split(',')]
+                specialties.extend(split_specialties)
+            
+            # Remove duplicates and empty strings
+            doctor_item['specialties'] = list(set(s for s in specialties if s))
 
             # Extract insurance plans
             insurance_list = profile_soup.select('.insurances-list li')
@@ -214,6 +222,7 @@ class DoctorScraper:
                 doctor_item['company'] = company_name.replace('-', ' ').title()
             else:
                 doctor_item['company'] = 'Private'
+                doctor_item['company_website'] = 'N/A'
 
             # Extract phone number
             try:
@@ -233,6 +242,11 @@ class DoctorScraper:
             # Clean phone numbers in locations
             for location in doctor_item['locations']:
                 location['phone'] = self.clean_phone_number(location['phone'])
+
+            # Extract company email
+            if doctor_item['company_website'] != 'N/A':
+                email = await self.extract_company_email(doctor_item['company_website'])
+                doctor_item['email'] = email if email else 'N/A'
 
             return doctor_item
         except Exception as e:
@@ -354,6 +368,53 @@ class DoctorScraper:
             return first_name, last_name
         else:
             return clean_name, ''
+
+    async def extract_company_email(self, website_url):
+        page = await self.browser.newPage()
+        await page.setUserAgent(self.get_current_user_agent())
+
+        try:
+            await page.goto(website_url, {'waitUntil': 'networkidle0', 'timeout': 60000})
+            logging.info(f"Navigated to company website: {website_url}")
+
+            # Look for common contact page links
+            contact_links = await page.evaluate('''
+                () => {
+                    const links = Array.from(document.querySelectorAll('a'));
+                    return links
+                        .filter(link => link.textContent.toLowerCase().includes('contact'))
+                        .map(link => link.href);
+                }
+            ''')
+
+            # If contact page found, navigate to it
+            if contact_links:
+                contact_url = urljoin(website_url, contact_links[0])
+                await page.goto(contact_url, {'waitUntil': 'networkidle0', 'timeout': 60000})
+                logging.info(f"Navigated to contact page: {contact_url}")
+
+            # Extract email from the page
+            email = await page.evaluate('''
+                () => {
+                    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+                    const pageText = document.body.innerText;
+                    const match = pageText.match(emailRegex);
+                    return match ? match[0] : null;
+                }
+            ''')
+
+            if email:
+                logging.info(f"Found company email: {email}")
+                return email
+            else:
+                logging.info("No email found on the company website")
+                return ''
+
+        except Exception as e:
+            logging.error(f"Error extracting company email: {e}", exc_info=True)
+            return ''
+        finally:
+            await page.close()
 
 async def main():
     scraper = DoctorScraper()
