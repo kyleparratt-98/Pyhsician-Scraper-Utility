@@ -133,19 +133,16 @@ class DoctorScraper:
                 full_name = name_element.text.strip()
                 doctor_item['full_name'] = full_name
                 
-                # Extract title and name parts
-                name_parts = full_name.split()
-                if name_parts:
-                    if name_parts[0].lower() in ['dr.', 'dr']:
-                        doctor_item['title'] = name_parts[0]
-                        name_parts = name_parts[1:]
-                    elif name_parts[0].lower() in ['mr.', 'mrs.', 'ms.', 'miss']:
-                        doctor_item['title'] = name_parts[0]
-                        name_parts = name_parts[1:]
-                    
-                    if name_parts:
-                        doctor_item['first_name'] = name_parts[0]
-                        doctor_item['last_name'] = ' '.join(name_parts[1:])
+                # Extract title
+                title_match = re.match(r'^(Dr\.|Mr\.|Mrs\.|Ms\.|Miss)\s', full_name)
+                if title_match:
+                    doctor_item['title'] = title_match.group(1)
+                    full_name = full_name[len(doctor_item['title']):].strip()
+                
+                # Use extract_name method to separate first and last name
+                first_name, last_name = self.extract_name(full_name)
+                doctor_item['first_name'] = first_name
+                doctor_item['last_name'] = last_name
 
             specialty_element = profile_soup.select_one("div.specialty.loc-vs-dspsplty")
             if specialty_element:
@@ -341,6 +338,22 @@ class DoctorScraper:
         if len(digits) == 10:
             return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
         return digits  # Return original digits if not 10 digits long
+
+    def extract_name(self, full_name):
+        # Remove known titles and qualifications
+        clean_name = re.sub(r'\b(Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Miss|DACM|L\.Ac\.?|MD|DO|PhD|RN|NP|PA(-C)?|DC)\b', '', full_name).strip()
+        clean_name = re.sub(r'[,.]', '', clean_name).strip()  # Remove commas and periods
+        
+        name_parts = clean_name.split()
+        
+        if len(name_parts) == 2:
+            return name_parts[0], name_parts[1]
+        elif len(name_parts) > 2:
+            first_name = ' '.join(name_parts[:-1])
+            last_name = name_parts[-1]
+            return first_name, last_name
+        else:
+            return clean_name, ''
 
 async def main():
     scraper = DoctorScraper()
