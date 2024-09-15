@@ -14,6 +14,24 @@ class DoctorScraper:
         self.max_doctors = 2
         self.browser = None
         self.base_url = 'https://www.vitals.com'
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59'
+        ]
+        self.current_user_agent = self.get_random_user_agent()
+        self.request_count = 0
+
+    def get_random_user_agent(self):
+        return random.choice(self.user_agents)
+
+    def get_current_user_agent(self):
+        self.request_count += 1
+        if self.request_count % 20 == 0:
+            self.current_user_agent = self.get_random_user_agent()
+        return self.current_user_agent
 
     async def init_browser(self):
         logging.info("Initializing browser...")
@@ -31,6 +49,9 @@ class DoctorScraper:
             await self.init_browser()
         page = await self.browser.newPage()
         await page.setViewport({"width": 1280, "height": 800})
+        
+        # Use the current user agent
+        await page.setUserAgent(self.get_current_user_agent())
         
         try:
             pagination_url = f"{url}?page={page_number}" if page_number > 1 else url
@@ -74,6 +95,10 @@ class DoctorScraper:
 
     async def scrape_profile(self, profile_url):
         page = await self.browser.newPage()
+        
+        # Use the current user agent
+        await page.setUserAgent(self.get_current_user_agent())
+        
         try:
             await page.goto(profile_url, {'waitUntil': 'networkidle0', 'timeout': 60000})
             logging.info(f"Navigated to profile: {profile_url}")
@@ -86,7 +111,7 @@ class DoctorScraper:
             
             doctor_item = {
                 'full_name': '',
-                'title': '',  # Change this line from 'Dr.' to an empty string
+                'title': '',
                 'specialty': '',
                 'country': 'USA',
                 'company': '',
@@ -167,7 +192,7 @@ class DoctorScraper:
                             'address': address.text.strip(),
                             'city': loc_city.text.strip().rstrip(','),
                             'state': loc_state.text.strip(),
-                            'phone': phone.text.strip() if phone else ''
+                            'phone': self.clean_phone_number(phone.text.strip()) if phone else ''
                         })
 
             # Extract website link and company name
