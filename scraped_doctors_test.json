@@ -1,0 +1,88 @@
+[
+  {
+    "full_name": "Dr. Paul F. Ryan DACM, L.Ac.",
+    "title": "Dr.",
+    "specialty": "Acupuncture, Integrative Medicine",
+    "country": "USA",
+    "company": "Private",
+    "email": "",
+    "first_name": "Paul",
+    "last_name": "F. Ryan DACM, L.Ac.",
+    "insurance_plans": [
+      "Aetna",
+      "Anthem BCBS",
+      "Cigna",
+      "Empire BCBS",
+      "United Healthcare"
+    ],
+    "education": [
+      {
+        "school": "Pacific College of Health and Science- Doctorate of Acupuncture and Chinese Medicine, Integrative Medicine",
+        "year": "Graduated in 2018"
+      },
+      {
+        "school": "Beijing University of Chinese Medicine Master's, Acupuncture and Chinese Medicine",
+        "year": "Graduated in 2002"
+      }
+    ],
+    "years_experience": "22",
+    "languages": [
+      "English"
+    ],
+    "locations": [
+      {
+        "name": "East West Integrated Wellness- Long Island",
+        "address": "102 Hawthorne St.",
+        "city": "Jefferson",
+        "state": "NY",
+        "phone": "917-979-3949"
+      }
+    ],
+    "company_website": "",
+    "phone": "917-979-3949"
+  },
+  {
+    "full_name": "Dr. Julia Walls",
+    "title": "Dr.",
+    "specialty": "Acupuncture, Chinese Medicine, Holistic Wellness",
+    "country": "USA",
+    "company": "Tualatin Acupuncture",
+    "email": "",
+    "first_name": "Julia",
+    "last_name": "Walls",
+    "insurance_plans": [
+      "Aetna",
+      "Anthem",
+      "Anthem Blue Cross",
+      "BCBS Blue Card PPO",
+      "Cigna",
+      "GEHA",
+      "Health Net",
+      "HealthNet",
+      "Humana",
+      "Moda Health Beacon",
+      "Oregon, Regence Blue Cross Blue Shield",
+      "PacificSource SmartHealth Oregon Members",
+      "Regence",
+      "United Healthcare",
+      "UnitedHealthcare",
+      "Workmans Comp"
+    ],
+    "education": [],
+    "years_experience": "",
+    "languages": [
+      "English"
+    ],
+    "locations": [
+      {
+        "name": "Tualatin Acupuncture & Integrative Medicine",
+        "address": "6464 SW Borland Rd Ste B6",
+        "city": "Tualatin",
+        "state": "OR",
+        "phone": "503-446-6574"
+      }
+    ],
+    "company_website": "https://www.tualatin-acupuncture.com/",
+    "phone": "503-446-6574"
+  }
+]
