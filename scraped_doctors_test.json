@@ -8,7 +8,7 @@
     ],
     "country": "USA",
     "company": "Private",
-    "email": "N/A",
+    "email_history": [],
     "first_name": "Paul F",
     "last_name": "Ryan",
     "insurance_plans": [
@@ -42,19 +42,35 @@
       }
     ],
     "company_website": "N/A",
-    "phone": "917-979-3949"
+    "phone": "917-979-3949",
+    "npi": "1740530831",
+    "gender": "M",
+    "email_confidence": {}
   },
   {
     "full_name": "Dr. Julia Walls",
     "title": "Dr.",
     "specialties": [
       "Acupuncture",
-      "Holistic Wellness",
-      "Chinese Medicine"
+      "Chinese Medicine",
+      "Holistic Wellness"
     ],
     "country": "USA",
     "company": "Tualatin Acupuncture",
-    "email": "info@tualatin-acupuncture.com",
+    "email_history": [
+      {
+        "email": "info@tualatin-acupuncture.com",
+        "type": "company",
+        "source": "Company Website",
+        "updated_at": "2024-09-15T19:30:41.412221"
+      },
+      {
+        "email": "julia@pathfinderwellness.com",
+        "type": "work",
+        "source": "Public Registry",
+        "updated_at": "2023-06-22T20:46:23"
+      }
+    ],
     "first_name": "Julia",
     "last_name": "Walls",
     "insurance_plans": [
@@ -65,14 +81,12 @@
       "Cigna",
       "GEHA",
       "Health Net",
-      "HealthNet",
       "Humana",
       "Moda Health Beacon",
       "Oregon, Regence Blue Cross Blue Shield",
       "PacificSource SmartHealth Oregon Members",
       "Regence",
       "United Healthcare",
-      "UnitedHealthcare",
       "Workmans Comp"
     ],
     "education": [],
@@ -90,6 +104,12 @@
       }
     ],
     "company_website": "https://www.tualatin-acupuncture.com/",
-    "phone": "503-446-6574"
+    "phone": "503-446-6574",
+    "npi": "1215328984",
+    "gender": "F",
+    "email_confidence": {
+      "info@tualatin-acupuncture.com": 0.9,
+      "julia@pathfinderwellness.com": 0.6
+    }
   }
 ]

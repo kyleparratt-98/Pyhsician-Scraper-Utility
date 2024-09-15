@@ -5,3 +5,5 @@ Twisted==22.10.0
 aiohttp
 certifi
 asyncio==3.4.3
+fuzzywuzzy
+python-Levenshtein

@@ -6,6 +6,11 @@ import json
 from urllib.parse import urljoin, urlparse
 import random
 import re
+import aiohttp
+import ssl
+import certifi
+from datetime import datetime
+from fuzzywuzzy import fuzz
 
 logging.basicConfig(level=logging.INFO)
 
@@ -96,14 +101,11 @@ class DoctorScraper:
     async def scrape_profile(self, profile_url):
         page = await self.browser.newPage()
         
-        # Use the current user agent
-        await page.setUserAgent(self.get_current_user_agent())
-        
         try:
+            await page.setUserAgent(self.get_current_user_agent())
             await page.goto(profile_url, {'waitUntil': 'networkidle0', 'timeout': 60000})
             logging.info(f"Navigated to profile: {profile_url}")
             
-            # Simulate reading the page
             await self.simulate_human_reading(page)
             
             profile_content = await page.content()
@@ -115,16 +117,19 @@ class DoctorScraper:
                 'specialties': [],
                 'country': 'USA',
                 'company': '',
-                'email': 'N/A',  # Initialize with 'N/A'
+                'email_history': [],
                 'first_name': '',
                 'last_name': '',
                 'insurance_plans': [],
                 'education': [],
-                'years_experience': 'N/A',  # Initialize with 'N/A'
+                'years_experience': 'N/A',
                 'languages': [],
                 'locations': [],
-                'company_website': 'N/A',  # Initialize with 'N/A'
-                'phone': '' 
+                'company_website': 'N/A',
+                'phone': '',
+                'npi': '',
+                'gender': 'N/A',
+                'email_confidence': {}
             }
 
             # Extract basic info
@@ -158,7 +163,10 @@ class DoctorScraper:
 
             # Extract insurance plans
             insurance_list = profile_soup.select('.insurances-list li')
-            doctor_item['insurance_plans'] = [insurance.text.strip() for insurance in insurance_list]
+            raw_insurance_plans = [insurance.text.strip() for insurance in insurance_list]
+            
+            # Clean and standardize insurance plans
+            doctor_item['insurance_plans'] = self.clean_insurance_plans(raw_insurance_plans)
             
             # Extract education
             education_sections = profile_soup.select('.description.loc-vc-mdschwrp')
@@ -245,8 +253,35 @@ class DoctorScraper:
 
             # Extract company email
             if doctor_item['company_website'] != 'N/A':
-                email = await self.extract_company_email(doctor_item['company_website'])
-                doctor_item['email'] = email if email else 'N/A'
+                company_email = await self.extract_company_email(doctor_item['company_website'])
+                if company_email:
+                    doctor_item['email_history'].append({
+                        "email": company_email,
+                        "type": "company",
+                        "source": "Company Website",
+                        "updated_at": self.get_current_timestamp()
+                    })
+                    doctor_item['email_confidence'][company_email] = 0.9
+
+            # Extract NPI number
+            profile_header = profile_soup.select_one('.profile-header-container')
+            if profile_header and 'data-qa-npi' in profile_header.attrs:
+                doctor_item['npi'] = profile_header['data-qa-npi']
+            else:
+                doctor_item['npi'] = 'N/A'
+
+            # Fetch work email and gender from NPI registry
+            if doctor_item['npi'] != 'N/A':
+                npi_data = await self.fetch_work_email_from_npi(doctor_item['npi'])
+                if npi_data['work_email'] != 'N/A':
+                    doctor_item['email_history'].append({
+                        "email": npi_data['work_email'],
+                        "type": "work",
+                        "source": "Public Registry",
+                        "updated_at": npi_data['last_updated']
+                    })
+                    doctor_item['email_confidence'][npi_data['work_email']] = 0.6
+                doctor_item['gender'] = npi_data['gender']
 
             return doctor_item
         except Exception as e:
@@ -254,6 +289,44 @@ class DoctorScraper:
             return None
         finally:
             await page.close()
+
+    async def fetch_work_email_from_npi(self, npi):
+        url = f"https://npiregistry.cms.hhs.gov/api/?version=2.1&number={npi}&limit=100"
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+            try:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data['result_count'] > 0:
+                            results = data['results'][0]
+                            npi_data = {
+                                'work_email': 'N/A',
+                                'gender': 'N/A',
+                                'last_updated': 'N/A'
+                            }
+                            
+                            # Extract work email
+                            endpoints = results.get('endpoints', [])
+                            for endpoint in endpoints:
+                                if endpoint.get('endpointType') == 'DIRECT':
+                                    npi_data['work_email'] = endpoint.get('endpoint', 'N/A')
+                                    break
+                            
+                            # Extract gender
+                            basic_info = results.get('basic', {})
+                            npi_data['gender'] = basic_info.get('gender', 'N/A')
+                            
+                            # Extract last updated timestamp
+                            last_updated_epoch = results.get('last_updated_epoch', 'N/A')
+                            if last_updated_epoch != 'N/A':
+                                last_updated_datetime = datetime.utcfromtimestamp(int(last_updated_epoch) / 1000)
+                                npi_data['last_updated'] = last_updated_datetime.isoformat()
+                            
+                            return npi_data
+            except Exception as e:
+                logging.error(f"Error fetching NPI data: {e}")
+        return {'work_email': 'N/A', 'gender': 'N/A', 'last_updated': 'N/A'}
 
     async def scrape(self):
         url = f'{self.base_url}/acupuncture'  # Start directly with the acupuncture specialty
@@ -415,6 +488,35 @@ class DoctorScraper:
             return ''
         finally:
             await page.close()
+
+    def get_current_timestamp(self):
+        return datetime.now().isoformat()
+
+    def clean_insurance_plans(self, plans):
+        # Convert to list and remove exact duplicates
+        unique_plans = list(set(plans))
+        
+        # Sort plans by length (longer names first) to prioritize more specific names
+        unique_plans.sort(key=len, reverse=True)
+        
+        standardized_plans = []
+        while unique_plans:
+            current_plan = unique_plans.pop(0)
+            similar_plans = [current_plan]
+            
+            # Compare with remaining plans
+            i = 0
+            while i < len(unique_plans):
+                if fuzz.ratio(current_plan.lower(), unique_plans[i].lower()) >= 90:
+                    similar_plans.append(unique_plans.pop(i))
+                else:
+                    i += 1
+            
+            # Choose the most common plan name from the similar plans
+            most_common = max(set(similar_plans), key=similar_plans.count)
+            standardized_plans.append(most_common)
+        
+        return sorted(standardized_plans)
 
 async def main():
     scraper = DoctorScraper()
