@@ -1,0 +1,18 @@
+{
+  "name": "node_doc",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start-ingestion": "node src/scripts/nppes_mass_ingestion/index.js --arg",
+    "start-update": "node src/scripts/nppes_weekly_updates_ingestion/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.0"
+  }
+}

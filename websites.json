@@ -1,0 +1,11 @@
+[
+    {
+        "website_url": "https://npiprofile.com/npi",
+        "scraping_allowed": true,
+        "robots_txt_url": "https://npiprofile.com/robots.txt",
+        "checked_date": "2024-09-22",
+        "data_scraped": [
+            "Insurance Plans Accepted"
+        ]
+    }
+]
