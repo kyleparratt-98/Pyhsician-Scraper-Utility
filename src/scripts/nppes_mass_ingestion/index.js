@@ -2,11 +2,13 @@ import { pool } from "../../common/db_config.js";
 import axios from "axios";
 import { usStates } from "../../common/constants.js";
 import { ConsoleLogger } from "../../common/logger.js";
+import { getTaxonomyMap } from "../../common/taxonomies.js";
 
 const logger = new ConsoleLogger();
 const args = process.argv.slice(2);
 const argValue = args.find(arg => arg.startsWith('--arg='));
 let specialty;
+const taxonomyMap = getTaxonomyMap();
 
 if (argValue) {
   specialty = argValue.split('=')[1];
@@ -16,7 +18,7 @@ if (argValue) {
   process.exit(1); 
 }
 
-const insertHealthcareProvider = async (client, provider, state) => {
+const insertHealthcareProvider = async (client, provider, state, taxonomies) => {
     const query = `
     INSERT INTO public.healthcare_providers (
       npi, npi_type, full_name, title, country, first_name, last_name, gender, nppes_created_at, nppes_updated_at, internal_updated_at, internal_created_at, sole_proprietor, years_experience, is_active, state, specialty
@@ -43,6 +45,10 @@ const insertHealthcareProvider = async (client, provider, state) => {
         (currentDate - enumerationDate) / (365.25 * 24 * 60 * 60 * 1000)
     );
 
+    //Find primary taxonomy
+    let primaryTaxonomy = taxonomies.find(taxonomy => taxonomy.primary === true);
+    if (!primaryTaxonomy) primaryTaxonomy = taxonomies[0];
+
     const values = [
         provider.number,
         provider.enumeration_type,
@@ -63,7 +69,7 @@ const insertHealthcareProvider = async (client, provider, state) => {
         yearsExperience,
         provider.basic.status === "A" ? true : false,
         state,
-        specialty
+        primaryTaxonomy ? taxonomyMap.get(primaryTaxonomy.code) : "N/A"
     ];
 
     const result = await client.query(query, values);
@@ -80,7 +86,7 @@ const insertSpecialties = async (client, npi, taxonomies) => {
     for (const taxonomy of taxonomies) {
         const values = [
             npi,
-            taxonomy.desc || "N/A",
+            taxonomyMap.get(taxonomy.code) || "N/A",
             taxonomy.state,
             taxonomy.license,
             taxonomy.primary,
@@ -155,7 +161,8 @@ function normalizeCredential(credential) {
 
 // Main function to process each provider
 const processProvider = async (client, provider, state) => {
-    const npi = await insertHealthcareProvider(client, provider, state);
+
+    const npi = await insertHealthcareProvider(client, provider, state, provider.taxonomies);
     await insertSpecialties(client, npi, provider.taxonomies);
     await insertInsurances(client, npi, provider.identifiers);
 
